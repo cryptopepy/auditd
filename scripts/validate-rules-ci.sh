@@ -6,15 +6,38 @@ rules_file="${1:-audit.rules}"
 work_dir="$(mktemp -d)"
 portable_rules="${work_dir}/99-ci-portable.rules"
 strict_rules="${work_dir}/99-ci-strict.rules"
+backup_dir="${work_dir}/backup"
+backup_rules_dir="${backup_dir}/rules.d"
+backup_audit_rules="${backup_dir}/audit.rules"
+had_rules_dir=0
+had_audit_rules=0
 
 cleanup() {
-  rm -rf "$work_dir"
+  if [[ "$had_rules_dir" == "1" || "$had_audit_rules" == "1" ]]; then
+    sudo rm -f /etc/audit/audit.rules
+    sudo rm -rf /etc/audit/rules.d
+
+    if [[ "$had_rules_dir" == "1" ]]; then
+      sudo cp -a "$backup_rules_dir" /etc/audit/rules.d
+    fi
+
+    if [[ "$had_audit_rules" == "1" ]]; then
+      sudo cp -a "$backup_audit_rules" /etc/audit/audit.rules
+    fi
+  fi
+
+  sudo rm -rf "$work_dir"
 }
 
 trap cleanup EXIT
 
 if [[ ! -f "$rules_file" ]]; then
   printf 'Rules file not found: %s\n' "$rules_file" >&2
+  exit 1
+fi
+
+if [[ "${GITHUB_ACTIONS:-}" != "true" && "${AUDITD_CI_ALLOW_LOCAL:-0}" != "1" ]]; then
+  printf 'Refusing to modify /etc/audit outside CI. Set AUDITD_CI_ALLOW_LOCAL=1 to override.\n' >&2
   exit 1
 fi
 
@@ -29,6 +52,20 @@ start_auditd() {
 
   if ! sudo pgrep -x auditd >/dev/null 2>&1; then
     sudo auditd
+  fi
+}
+
+backup_existing_rules() {
+  sudo mkdir -p "$backup_dir"
+
+  if sudo test -d /etc/audit/rules.d; then
+    sudo cp -a /etc/audit/rules.d "$backup_rules_dir"
+    had_rules_dir=1
+  fi
+
+  if sudo test -f /etc/audit/audit.rules; then
+    sudo cp -a /etc/audit/audit.rules "$backup_audit_rules"
+    had_audit_rules=1
   fi
 }
 
@@ -141,6 +178,7 @@ build_ci_copy() {
 }
 
 start_auditd
+backup_existing_rules
 
 build_ci_copy "$rules_file" "$portable_rules" 0
 load_rules_copy "$portable_rules"
