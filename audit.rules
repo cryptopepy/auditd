@@ -111,7 +111,7 @@
 -w /etc/sysctl.d -p wa -k sysctl
 
 ## Kernel module loading and unloading
--a always,exit -F arch=b64 -S finit_module -S init_module -S delete_module -F auid!=-1 -k modules
+-a always,exit -F arch=b64 -S finit_module -S init_module -S delete_module -F auid!=unset -k modules
 
 ## Modprobe configuration
 -w /etc/modprobe.conf -p wa -k modprobe
@@ -124,10 +124,10 @@
 -a always,exit -F arch=b64 -S mknod -S mknodat -k specialfiles
 
 ## Mount operations (only attributable)
--a always,exit -F arch=b64 -S mount -S umount2 -F auid!=-1 -k mount
+-a always,exit -F arch=b64 -S mount -S umount2 -F auid!=unset -k mount
 
 ## Change swap (only attributable)
--a always,exit -F arch=b64 -S swapon -S swapoff -F auid!=-1 -k swap
+-a always,exit -F arch=b64 -S swapon -S swapoff -F auid!=unset -k swap
 
 ## Time
 -a always,exit -F arch=b64 -F uid!=ntp -S adjtimex -S settimeofday -S clock_settime -k time
@@ -261,19 +261,22 @@
 -w /var/log/wtmp -p wa -k session
 
 ## Discretionary Access Control (DAC) modifications
--a always,exit -F arch=b64 -S chmod  -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S chown -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fchmod -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fchmodat -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fchown -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fchownat -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S fsetxattr -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S lchown -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S lremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S lsetxattr -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S removexattr -F auid>=1000 -F auid!=-1 -k perm_mod
--a always,exit -F arch=b64 -S setxattr -F auid>=1000 -F auid!=-1 -k perm_mod
+## NOTE: Rules that use `auid>=1000` assume the common Linux `UID_MIN=1000`.
+## If your host uses a different UID_MIN in `/etc/login.defs`, replace `1000`
+## accordingly before deployment. `auid!=unset` excludes daemon/system sessions.
+-a always,exit -F arch=b64 -S chmod  -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S chown -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fchmod -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fchmodat -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fchown -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fchownat -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S fsetxattr -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S lchown -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S lremovexattr -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S lsetxattr -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S removexattr -F auid>=1000 -F auid!=unset -k perm_mod
+-a always,exit -F arch=b64 -S setxattr -F auid>=1000 -F auid!=unset -k perm_mod
 
 # Special Rules ---------------------------------------------------------------
 
@@ -331,7 +334,7 @@
 
 ## Privilege Abuse
 ### The purpose of this rule is to detect when an admin may be abusing power by looking in user's home dir.
--a always,exit -F dir=/home -F uid=0 -F auid>=1000 -F auid!=-1 -C auid!=obj_uid -k power_abuse
+-a always,exit -F dir=/home -F uid=0 -F auid>=1000 -F auid!=unset -C auid!=obj_uid -k power_abuse
 
 # Socket Creations
 # will catch both IPv4 and IPv6
@@ -443,12 +446,12 @@
 -a always,exit -F arch=b64 -S execve -S execveat -k process_creation
 
 ## File Deletion Events by User
--a always,exit -F arch=b64 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=-1 -k delete
+-a always,exit -F arch=b64 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=unset -k delete
 
 ## File Access
 ### Unauthorized Access (unsuccessful)
--a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=-1 -k file_access
--a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=-1 -k file_access
+-a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k file_access
+-a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k file_access
 
 ### Unsuccessful Creation
 -a always,exit -F arch=b64 -S mkdir,creat,link,symlink,mknod,mknodat,linkat,symlinkat -F exit=-EACCES -k file_creation
